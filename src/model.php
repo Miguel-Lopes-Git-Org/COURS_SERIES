@@ -11,36 +11,29 @@ function bddConexion()
     $env = [];
     $envPath = __DIR__ . '/../.env';
     
-    // Log for debugging (check PHP error logs)
-    error_log("Trying to load .env from: " . $envPath);
-
     if (file_exists($envPath)) {
         $parsed = parse_ini_file($envPath);
         if ($parsed !== false) {
             $env = $parsed;
-            error_log(".env file found and parsed.");
-        } else {
-            error_log("Failed to parse .env file.");
+            error_log("[DEBUG] .env file keys found: " . implode(", ", array_keys($env)));
         }
-    } else {
-        error_log(".env file not found at " . $envPath);
     }
-    
-    $host = $env['HOST'] ?? getenv('HOST') ?: '127.0.0.1';
-    $dbname = $env['DBNAME'] ?? getenv('DBNAME') ?: 'test';
-    $user = $env['USER'] ?? getenv('USER') ?: 'root';
-    $pass = $env['PASS'] ?? getenv('PASS') ?: '';
 
-    // Debug log (DO NOT LOG THE PASS)
-    error_log("DB Config: host=$host, dbname=$dbname, user=$user");
+    // Priorité aux variables d'environnement système (Docker), puis au .env, puis aux valeurs par défaut
+    $host   = getenv('HOST')   ?: ($env['HOST']   ?? '127.0.0.1');
+    $dbname = getenv('DBNAME') ?: ($env['DBNAME'] ?? 'test');
+    $user   = getenv('USER')   ?: ($env['USER']   ?? 'root');
+    $pass   = getenv('PASS')   ?: ($env['PASS']   ?? '');
+
+    error_log("[DEBUG] Final Database Config: host=$host, dbname=$dbname, user=$user");
 
     try {
         $bdd = new PDO('pgsql:host=' . $host . ' ;dbname=' . $dbname, $user, $pass);
         $bdd->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $bdd;
     } catch (Exception $e) {
-        error_log("Connection failed: " . $e->getMessage());
-        die('Erreur de connexion à la base de données. Veuillez consulter les logs.');
+        error_log("[ERROR] Connection failed: " . $e->getMessage());
+        die('Erreur de connexion à la base de données. Veuillez consulter les logs du serveur.');
     }
 }
 
