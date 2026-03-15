@@ -19,16 +19,23 @@ function bddConexion()
         }
     }
 
-    // Priorité aux variables d'environnement système (Docker), puis au .env, puis aux valeurs par défaut
-    $host   = getenv('HOST')   ?: ($env['HOST']   ?? '127.0.0.1');
-    $dbname = getenv('DBNAME') ?: ($env['DBNAME'] ?? 'test');
-    $user   = getenv('USER')   ?: ($env['USER']   ?? 'root');
-    $pass   = getenv('PASS')   ?: ($env['PASS']   ?? '');
+    // Fonction helper pour récupérer une valeur nettoyée
+    $getVal = function($key, $default) use ($env) {
+        $val = getenv($key) ?: ($env[$key] ?? '');
+        $val = trim($val, " \t\n\r\0\x0B\""); // Enlever espaces et guillemets superflus
+        return ($val !== '') ? $val : $default;
+    };
+
+    $host   = $getVal('HOST', '127.0.0.1');
+    $dbname = $getVal('DBNAME', 'test');
+    $user   = $getVal('USER', 'root');
+    $pass   = $getVal('PASS', '');
 
     error_log("[DEBUG] Final Database Config: host=$host, dbname=$dbname, user=$user");
 
     try {
-        $bdd = new PDO('pgsql:host=' . $host . ' ;dbname=' . $dbname, $user, $pass);
+        $dsn = "pgsql:host=$host;dbname=$dbname";
+        $bdd = new PDO($dsn, $user, $pass);
         $bdd->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $bdd;
     } catch (Exception $e) {
