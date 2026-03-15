@@ -15,12 +15,12 @@ jobs:
 
       - name: Create myParam.inc.php
         run: |
-          cat > src/myParam.inc.php << 'PHPEOF'
+          cat > src/myParam.inc.php << PHPEOF
           <?php
-          define('DB_HOST', '${{ secrets.DB_HOST }}');
-          define('DB_USER', '${{ secrets.DB_USER }}');
-          define('DB_PASS', '${{ secrets.DB_PASS }}');
-          define('DB_NAME', '${{ secrets.DB_NAME }}');
+          define('DB_HOST', '${{ secrets.HOST }}');
+          define('DB_USER', '${{ secrets.USER }}');
+          define('DB_PASS', '${{ secrets.PASS }}');
+          define('DB_NAME', '${{ secrets.DBNAME }}');
           PHPEOF
 
       - name: Deploy with Docker Compose
