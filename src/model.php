@@ -8,41 +8,21 @@
 
 function bddConexion()
 {
-    $env = [];
-    $envPath = __DIR__ . '/../.env';
+    $paramFile = __DIR__ . '/myParam.inc.php';
 
-    if (file_exists($envPath)) {
-        $parsed = parse_ini_file($envPath);
-        if ($parsed !== false) {
-            $env = $parsed;
-            error_log("[DEBUG] .env file keys found: " . implode(", ", array_keys($env)));
-        }
+    if (!file_exists($paramFile)) {
+        error_log("[ERROR] myParam.inc.php introuvable : " . $paramFile);
+        die('Erreur de configuration du serveur. Fichier de paramètres manquant.');
     }
 
-    // Le .env est PRIORITAIRE sur les variables d'environnement système
-    // pour éviter les collisions avec USER=root, HOST=127.0.0.1 de Linux
-    $getVal = function($key, $default) use ($env) {
-        // 1. Valeur du .env en priorité
-        if (isset($env[$key]) && trim($env[$key]) !== '') {
-            return trim($env[$key], " \t\n\r\0\x0B\"");
-        }
-        // 2. Variable d'environnement système en fallback
-        $val = getenv($key);
-        if ($val !== false && trim($val) !== '') {
-            return trim($val, " \t\n\r\0\x0B\"");
-        }
-        return $default;
-    };
+    require_once $paramFile;
 
-    $host   = $getVal('DB_HOST', '127.0.0.1');
-    $dbname = $getVal('DB_NAME', 'test');
-    $user   = $getVal('DB_USER', 'root');
-    $pass   = $getVal('DB_PASS', '');
+    $host   = DB_HOST;
+    $dbname = DB_NAME;
+    $user   = DB_USER;
+    $pass   = DB_PASS;
 
-    // Debug plus précis : affiche la longueur et le premier caractère (sauf pass)
-    $hostDebug = $host . " (len:".strlen($host).")";
-    $dbDebug = $dbname . " (len:".strlen($dbname).")";
-    error_log("[DEBUG] Final Config - Host: '$hostDebug', DB: '$dbDebug', User: '$user'");
+    error_log("[DEBUG] Final Database Config: host=$host, dbname=$dbname, user=$user");
 
     try {
         $dsn = "pgsql:host=$host;dbname=$dbname";

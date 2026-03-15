@@ -13,14 +13,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create .env file
+      - name: Create myParam.inc.php
         run: |
-          printf "DB_HOST=%s\nDB_USER=%s\nDB_PASS=%s\nDB_NAME=%s\n" "$DB_HOST" "$DB_USER" "$DB_PASS" "$DB_NAME" > .env
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-          DB_NAME: ${{ secrets.DB_NAME }}
+          cat > src/myParam.inc.php << 'PHPEOF'
+          <?php
+          define('DB_HOST', '${{ secrets.DB_HOST }}');
+          define('DB_USER', '${{ secrets.DB_USER }}');
+          define('DB_PASS', '${{ secrets.DB_PASS }}');
+          define('DB_NAME', '${{ secrets.DB_NAME }}');
+          PHPEOF
 
       - name: Deploy with Docker Compose
         run: |
