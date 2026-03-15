@@ -31,7 +31,10 @@ function bddConexion()
     $user   = $getVal('USER', 'root');
     $pass   = $getVal('PASS', '');
 
-    error_log("[DEBUG] Final Database Config: host=$host, dbname=$dbname, user=$user");
+    // Debug plus précis : affiche la longueur et le premier caractère (sauf pass)
+    $hostDebug = $host . " (len:".strlen($host).")";
+    $dbDebug = $dbname . " (len:".strlen($dbname).")";
+    error_log("[DEBUG] Final Config - Host: '$hostDebug', DB: '$dbDebug', User: '$user'");
 
     try {
         $dsn = "pgsql:host=$host;dbname=$dbname";
