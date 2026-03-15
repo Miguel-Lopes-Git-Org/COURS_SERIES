@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml is required for docker builds - removed from gitignore
 vendor/
 
 # Environment

@@ -1,8 +1,8 @@
 # Étape 1 : Build du CSS (Node.js)
 FROM node:20-slim AS builder
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable && pnpm install
 COPY . .
 RUN pnpm run build:css
 
