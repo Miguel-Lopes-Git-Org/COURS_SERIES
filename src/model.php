@@ -10,7 +10,7 @@ function bddConexion()
 {
     $env = [];
     $envPath = __DIR__ . '/../.env';
-    
+
     if (file_exists($envPath)) {
         $parsed = parse_ini_file($envPath);
         if ($parsed !== false) {
@@ -19,17 +19,25 @@ function bddConexion()
         }
     }
 
-    // Fonction helper pour récupérer une valeur nettoyée
+    // Le .env est PRIORITAIRE sur les variables d'environnement système
+    // pour éviter les collisions avec USER=root, HOST=127.0.0.1 de Linux
     $getVal = function($key, $default) use ($env) {
-        $val = getenv($key) ?: ($env[$key] ?? '');
-        $val = trim($val, " \t\n\r\0\x0B\""); // Enlever espaces et guillemets superflus
-        return ($val !== '') ? $val : $default;
+        // 1. Valeur du .env en priorité
+        if (isset($env[$key]) && trim($env[$key]) !== '') {
+            return trim($env[$key], " \t\n\r\0\x0B\"");
+        }
+        // 2. Variable d'environnement système en fallback
+        $val = getenv($key);
+        if ($val !== false && trim($val) !== '') {
+            return trim($val, " \t\n\r\0\x0B\"");
+        }
+        return $default;
     };
 
-    $host   = $getVal('HOST', '127.0.0.1');
-    $dbname = $getVal('DBNAME', 'test');
-    $user   = $getVal('USER', 'root');
-    $pass   = $getVal('PASS', '');
+    $host   = $getVal('DB_HOST', '127.0.0.1');
+    $dbname = $getVal('DB_NAME', 'test');
+    $user   = $getVal('DB_USER', 'root');
+    $pass   = $getVal('DB_PASS', '');
 
     // Debug plus précis : affiche la longueur et le premier caractère (sauf pass)
     $hostDebug = $host . " (len:".strlen($host).")";
