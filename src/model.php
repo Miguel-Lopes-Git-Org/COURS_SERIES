@@ -11,7 +11,6 @@ function bddConexion()
     $paramFile = __DIR__ . '/myParam.inc.php';
 
     if (!file_exists($paramFile)) {
-        error_log("[ERROR] myParam.inc.php introuvable : " . $paramFile);
         die('Erreur de configuration du serveur. Fichier de paramètres manquant.');
     }
 
@@ -22,15 +21,12 @@ function bddConexion()
     $user   = DB_USER;
     $pass   = DB_PASS;
 
-    error_log("[DEBUG] Final Database Config: host=$host, dbname=$dbname, user=$user");
-
     try {
         $dsn = "pgsql:host=$host;dbname=$dbname";
         $bdd = new PDO($dsn, $user, $pass);
         $bdd->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $bdd;
     } catch (Exception $e) {
-        error_log("[ERROR] Connection failed: " . $e->getMessage());
         die('Erreur de connexion à la base de données. Veuillez consulter les logs du serveur.');
     }
 }
@@ -378,8 +374,8 @@ function loginUser(string $email, string $password): array
     session_regenerate_id(true);
 
     $_SESSION['email']     = $user['email'];
-    $_SESSION['firstName'] = $user['firstName'];
-    $_SESSION['lastName']  = $user['lastName'];
+    $_SESSION['firstName'] = $user['firstName'] ?? null;
+    $_SESSION['lastName']  = $user['lastName']  ?? null;
 
     return [];
 }
