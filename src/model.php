@@ -10,11 +10,20 @@ function bddConexion()
 {
     $env = [];
     $envPath = __DIR__ . '/../.env';
+    
+    // Log for debugging (check PHP error logs)
+    error_log("Trying to load .env from: " . $envPath);
+
     if (file_exists($envPath)) {
         $parsed = parse_ini_file($envPath);
         if ($parsed !== false) {
             $env = $parsed;
+            error_log(".env file found and parsed.");
+        } else {
+            error_log("Failed to parse .env file.");
         }
+    } else {
+        error_log(".env file not found at " . $envPath);
     }
     
     $host = $env['HOST'] ?? getenv('HOST') ?: '127.0.0.1';
@@ -22,11 +31,16 @@ function bddConexion()
     $user = $env['USER'] ?? getenv('USER') ?: 'root';
     $pass = $env['PASS'] ?? getenv('PASS') ?: '';
 
+    // Debug log (DO NOT LOG THE PASS)
+    error_log("DB Config: host=$host, dbname=$dbname, user=$user");
+
     try {
         $bdd = new PDO('pgsql:host=' . $host . ' ;dbname=' . $dbname, $user, $pass);
+        $bdd->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $bdd;
     } catch (Exception $e) {
-        die('Erreur : ' . $e->getMessage());
+        error_log("Connection failed: " . $e->getMessage());
+        die('Erreur de connexion à la base de données. Veuillez consulter les logs.');
     }
 }
 
