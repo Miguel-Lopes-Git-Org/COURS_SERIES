@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+vendor/
+
+# Environment
+.env
+.env.local
+.env.*.local
+myParam.inc.php
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output
+templates/style.css
+
+# Docker
+.docker/

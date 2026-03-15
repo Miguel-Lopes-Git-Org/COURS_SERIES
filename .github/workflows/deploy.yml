@@ -1,0 +1,26 @@
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          echo "HOST=${{ secrets.DB_HOST }}" > .env
+          echo "USER=${{ secrets.DB_USER }}" >> .env
+          echo "PASS=\"${{ secrets.DB_PASS }}\"" >> .env
+          echo "DBNAME=${{ secrets.DB_NAME }}" >> .env
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker-compose down
+          docker-compose up -d --build
