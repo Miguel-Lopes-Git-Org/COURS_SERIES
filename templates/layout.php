@@ -5,11 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?></title>
-    <script defer src="templates/tailwind.js?v=<?= time() ?>"></script>
+    <script src="templates/tailwind.js?v=<?= time() ?>"></script>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="templates/style.css">
 </head>
 
 <body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col pt-16 selection:bg-red-600 selection:text-white">
