@@ -5,14 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?></title>
-    <link rel="stylesheet" href="templates/style.css?v=<?= time() ?>">
+    <script defer src="templates/tailwind.js?v=<?= time() ?>"></script>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
 </head>
 
 <body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col pt-16 selection:bg-red-600 selection:text-white">
@@ -38,9 +35,9 @@
             </ul>
         </div>
     </nav>
-    
+
     <main class="flex-grow w-full flex flex-col relative">
-        <?= $content ?>
+        <?= $content ?? '' ?>
     </main>
 
     <footer class="mt-auto py-8 text-center text-sm text-zinc-500 border-t border-zinc-900 bg-zinc-950">
