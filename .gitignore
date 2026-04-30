@@ -19,8 +19,5 @@ myParam.inc.php
 .DS_Store
 Thumbs.db
 
-# Build output
-templates/style.css
-
 # Docker
 .docker/
