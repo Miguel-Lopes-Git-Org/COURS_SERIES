@@ -310,23 +310,14 @@ function registerUser(array $data): array
 
     $id_user  = uniqid('u_', true);
     $hashed   = password_hash($data['password'], PASSWORD_BCRYPT);
-
-    // Formatage de la date d'expiration (MM/AA → YYYY-MM-DD)
-    $expiryFormatted = null;
-    if (!empty($data['creditCardExpirationDate'])) {
-        $parts = explode('/', $data['creditCardExpirationDate']);
-        if (count($parts) === 2) {
-            $month = str_pad(trim($parts[0]), 2, '0', STR_PAD_LEFT);
-            $year  = '20' . ltrim(trim($parts[1]), '0');
-            $expiryFormatted = $year . '-' . $month . '-01';
-        }
-    }
+    $userCount = (int)$bdd->query('SELECT COUNT(*) FROM USERS')->fetchColumn();
+    $role = $userCount === 0 ? 'admin' : 'user';
 
     $stmt = $bdd->prepare(
-        'INSERT INTO createUser (id_user, email, password, firstName, lastName, streetAddress, zipCode, city, phoneNumber)
+        'INSERT INTO createUser (id_user, email, password, firstName, lastName, streetAddress, zipCode, city, phoneNumber, role)
          VALUES
             (:id_user, :email, :password, :firstName, :lastName,
-             :streetAddress, :zipCode, :city, :phoneNumber)'
+             :streetAddress, :zipCode, :city, :phoneNumber, :role)'
     );
 
     $stmt->execute([
@@ -339,6 +330,7 @@ function registerUser(array $data): array
         ':zipCode'       => $data['zipCode']       ?? null,
         ':city'          => $data['city']          ?? null,
         ':phoneNumber'   => $data['phoneNumber']   ?? null,
+        ':role'          => $role,
     ]);
 
     return [];
@@ -374,8 +366,472 @@ function loginUser(string $email, string $password): array
     session_regenerate_id(true);
 
     $_SESSION['email']     = $user['email'];
-    $_SESSION['firstName'] = $user['firstName'] ?? null;
-    $_SESSION['lastName']  = $user['lastName']  ?? null;
+    $_SESSION['firstName'] = $user['firstname'] ?? null;
+    $_SESSION['lastName']  = $user['lastname']  ?? null;
+    $_SESSION['role']      = $user['role'] ?? 'user';
 
     return [];
+}
+
+function getCurrentUserInformations(string $email): ?array
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare('SELECT * FROM getUserInformations WHERE email = :email');
+    $stmt->execute([':email' => $email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $user ?: null;
+}
+
+function getAdminDashboardData(): array
+{
+    $bdd = bddConexion();
+
+    return [
+        'series' => $bdd->query(
+            "SELECT se.id_serie, se.titrevf, se.titrevo, se.slug, se.nb_saisons, se.date_creation,
+                    se.image_url_path, se.video_path_url, se.banner_path_url, se.description,
+                    se.musique_generique, p.nom_pays, ge.libelle_genre,
+                    pe.prenom || ' ' || pe.nom AS createur
+             FROM SERIE se
+             JOIN PAYS p ON se.id_pays = p.id_pays
+             JOIN GENRE ge ON se.id_genre = ge.id_genre
+             JOIN CREATEUR cr ON se.id_createur = cr.id_createur
+             JOIN PERSONNE pe ON cr.id_createur = pe.id_personne
+             ORDER BY se.id_serie"
+        )->fetchAll(PDO::FETCH_ASSOC),
+        'saisons' => $bdd->query(
+            'SELECT sa.id_serie, sa.id_saison, sa.nb_episodes, sa.date_debut_tournage, sa.date_fin_tournage,
+                    se.titrevf
+             FROM SAISON sa
+             JOIN SERIE se ON sa.id_serie = se.id_serie
+             ORDER BY se.titrevf, sa.id_saison'
+        )->fetchAll(PDO::FETCH_ASSOC),
+        'episodes' => $bdd->query(
+            'SELECT ep.id_serie, ep.id_saison, ep.id_episode, ep.titre_fr, ep.titre_vo,
+                    ep.date_diff_original, ep.date_diff_fr, ep.image_url_path, ep.duree, ep.description,
+                    se.titrevf
+             FROM EPISODE ep
+             JOIN SERIE se ON ep.id_serie = se.id_serie
+             ORDER BY se.titrevf, ep.id_saison, ep.id_episode'
+        )->fetchAll(PDO::FETCH_ASSOC),
+        'personnages' => $bdd->query(
+            "SELECT perso.id_personnage, pe.nom, pe.prenom, pe.image_url_path, perso.desc_perso,
+                    STRING_AGG(DISTINCT pos.lib_position, ', ') AS positions
+             FROM PERSONNAGE perso
+             JOIN PERSONNE pe ON perso.id_personnage = pe.id_personne
+             LEFT JOIN ATTACHER att ON perso.id_personnage = att.id_personnage
+             LEFT JOIN POSITION pos ON att.id_position = pos.id_position
+             GROUP BY perso.id_personnage, pe.nom, pe.prenom, pe.image_url_path, perso.desc_perso
+             ORDER BY pe.nom, pe.prenom"
+        )->fetchAll(PDO::FETCH_ASSOC),
+        'refs' => [
+            'series' => $bdd->query('SELECT id_serie, titrevf FROM SERIE ORDER BY titrevf')->fetchAll(PDO::FETCH_ASSOC),
+            'pays' => $bdd->query('SELECT id_pays, nom_pays FROM PAYS ORDER BY nom_pays')->fetchAll(PDO::FETCH_ASSOC),
+            'genres' => $bdd->query('SELECT id_genre, libelle_genre FROM GENRE ORDER BY libelle_genre')->fetchAll(PDO::FETCH_ASSOC),
+            'createurs' => $bdd->query(
+                "SELECT cr.id_createur, pe.prenom || ' ' || pe.nom AS nom_complet
+                 FROM CREATEUR cr
+                 JOIN PERSONNE pe ON cr.id_createur = pe.id_personne
+                 ORDER BY pe.nom, pe.prenom"
+            )->fetchAll(PDO::FETCH_ASSOC),
+            'positions' => $bdd->query('SELECT id_position, lib_position FROM POSITION ORDER BY lib_position')->fetchAll(PDO::FETCH_ASSOC),
+            'doubleurs' => $bdd->query(
+                "SELECT dbl.id_doubleur, pe.prenom || ' ' || pe.nom AS nom_complet
+                 FROM DOUBLEUR dbl
+                 JOIN PERSONNE pe ON dbl.id_doubleur = pe.id_personne
+                 ORDER BY pe.nom, pe.prenom"
+            )->fetchAll(PDO::FETCH_ASSOC),
+        ],
+    ];
+}
+
+function handleAdminPost(string $action, array $data): array
+{
+    $tabByAction = [
+        'adminSerieCreate' => 'series',
+        'adminSerieUpdate' => 'series',
+        'adminSerieDelete' => 'series',
+        'adminSaisonCreate' => 'saisons',
+        'adminSaisonUpdate' => 'saisons',
+        'adminSaisonDelete' => 'saisons',
+        'adminEpisodeCreate' => 'episodes',
+        'adminEpisodeUpdate' => 'episodes',
+        'adminEpisodeDelete' => 'episodes',
+        'adminPersonnageCreate' => 'personnages',
+        'adminPersonnageUpdate' => 'personnages',
+        'adminPersonnageDelete' => 'personnages',
+    ];
+
+    try {
+        switch ($action) {
+            case 'adminSerieCreate':
+                adminCreateSerie($data);
+                break;
+            case 'adminSerieUpdate':
+                adminUpdateSerie($data);
+                break;
+            case 'adminSerieDelete':
+                adminDeleteSerie((int)($data['id_serie'] ?? 0));
+                break;
+            case 'adminSaisonCreate':
+                adminCreateSaison($data);
+                break;
+            case 'adminSaisonUpdate':
+                adminUpdateSaison($data);
+                break;
+            case 'adminSaisonDelete':
+                adminDeleteSaison((int)($data['id_serie'] ?? 0), (int)($data['id_saison'] ?? 0));
+                break;
+            case 'adminEpisodeCreate':
+                adminCreateEpisode($data);
+                break;
+            case 'adminEpisodeUpdate':
+                adminUpdateEpisode($data);
+                break;
+            case 'adminEpisodeDelete':
+                adminDeleteEpisode((int)($data['id_serie'] ?? 0), (int)($data['id_saison'] ?? 0), (int)($data['id_episode'] ?? 0));
+                break;
+            case 'adminPersonnageCreate':
+                adminCreatePersonnage($data);
+                break;
+            case 'adminPersonnageUpdate':
+                adminUpdatePersonnage($data);
+                break;
+            case 'adminPersonnageDelete':
+                adminDeletePersonnage((string)($data['id_personnage'] ?? ''));
+                break;
+            default:
+                return ['messages' => [], 'errors' => ['Action admin inconnue.'], 'tab' => $data['tab'] ?? 'series'];
+        }
+
+        return ['messages' => ['Operation admin effectuee.'], 'errors' => [], 'tab' => $tabByAction[$action] ?? 'series'];
+    } catch (Throwable $e) {
+        return ['messages' => [], 'errors' => ['Erreur admin : ' . $e->getMessage()], 'tab' => $tabByAction[$action] ?? ($data['tab'] ?? 'series')];
+    }
+}
+
+function adminCreateSerie(array $data): void
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'INSERT INTO SERIE (titreVF, titreVO, nb_saisons, description, date_creation, image_url_path,
+                            video_path_url, banner_path_url, musique_generique, slug, id_pays, id_createur, id_genre)
+         VALUES (:titreVF, :titreVO, :nb_saisons, :description, :date_creation, :image_url_path,
+                 :video_path_url, :banner_path_url, :musique_generique, :slug, :id_pays, :id_createur, :id_genre)'
+    );
+    $stmt->execute(adminSerieParams($data));
+}
+
+function adminUpdateSerie(array $data): void
+{
+    $params = adminSerieParams($data);
+    $params[':id_serie'] = (int)$data['id_serie'];
+
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'UPDATE SERIE
+         SET titreVF = :titreVF, titreVO = :titreVO, nb_saisons = :nb_saisons, description = :description,
+             date_creation = :date_creation, image_url_path = :image_url_path, video_path_url = :video_path_url,
+             banner_path_url = :banner_path_url, musique_generique = :musique_generique, slug = :slug,
+             id_pays = :id_pays, id_createur = :id_createur, id_genre = :id_genre
+         WHERE id_serie = :id_serie'
+    );
+    $stmt->execute($params);
+}
+
+function adminSerieParams(array $data): array
+{
+    return [
+        ':titreVF' => trim($data['titreVF'] ?? ''),
+        ':titreVO' => nullIfEmpty($data['titreVO'] ?? null),
+        ':nb_saisons' => (int)($data['nb_saisons'] ?? 1),
+        ':description' => nullIfEmpty($data['description'] ?? null),
+        ':date_creation' => $data['date_creation'] ?? date('Y-m-d'),
+        ':image_url_path' => nullIfEmpty($data['image_url_path'] ?? null),
+        ':video_path_url' => nullIfEmpty($data['video_path_url'] ?? null),
+        ':banner_path_url' => nullIfEmpty($data['banner_path_url'] ?? null),
+        ':musique_generique' => nullIfEmpty($data['musique_generique'] ?? null),
+        ':slug' => trim($data['slug'] ?? ''),
+        ':id_pays' => $data['id_pays'] ?? '',
+        ':id_createur' => $data['id_createur'] ?? '',
+        ':id_genre' => $data['id_genre'] ?? '',
+    ];
+}
+
+function adminDeleteSerie(int $idSerie): void
+{
+    $bdd = bddConexion();
+    $bdd->beginTransaction();
+    try {
+        $bdd->prepare('DELETE FROM CASTING WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM REALISER WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM SCENARISER WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM PRODUIRE WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM EPISODE WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM SAISON WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM DIFFUSER WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->prepare('DELETE FROM SERIE WHERE id_serie = :id')->execute([':id' => $idSerie]);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminCreateSaison(array $data): void
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'INSERT INTO SAISON (id_serie, id_saison, nb_episodes, date_debut_tournage, date_fin_tournage)
+         VALUES (:id_serie, :id_saison, :nb_episodes, :date_debut_tournage, :date_fin_tournage)'
+    );
+    $stmt->execute(adminSaisonParams($data));
+}
+
+function adminUpdateSaison(array $data): void
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'UPDATE SAISON
+         SET nb_episodes = :nb_episodes, date_debut_tournage = :date_debut_tournage, date_fin_tournage = :date_fin_tournage
+         WHERE id_serie = :id_serie AND id_saison = :id_saison'
+    );
+    $stmt->execute(adminSaisonParams($data));
+}
+
+function adminSaisonParams(array $data): array
+{
+    return [
+        ':id_serie' => (int)($data['id_serie'] ?? 0),
+        ':id_saison' => (int)($data['id_saison'] ?? 1),
+        ':nb_episodes' => (int)($data['nb_episodes'] ?? 1),
+        ':date_debut_tournage' => nullIfEmpty($data['date_debut_tournage'] ?? null),
+        ':date_fin_tournage' => nullIfEmpty($data['date_fin_tournage'] ?? null),
+    ];
+}
+
+function adminDeleteSaison(int $idSerie, int $idSaison): void
+{
+    $bdd = bddConexion();
+    $bdd->beginTransaction();
+    try {
+        $params = [':id_serie' => $idSerie, ':id_saison' => $idSaison];
+        $bdd->prepare('DELETE FROM CASTING WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->prepare('DELETE FROM REALISER WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->prepare('DELETE FROM SCENARISER WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->prepare('DELETE FROM PRODUIRE WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->prepare('DELETE FROM EPISODE WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->prepare('DELETE FROM SAISON WHERE id_serie = :id_serie AND id_saison = :id_saison')->execute($params);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminCreateEpisode(array $data): void
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'INSERT INTO EPISODE (id_serie, id_saison, id_episode, titre_vo, date_diff_original, date_diff_fr,
+                              titre_fr, image_url_path, duree, description)
+         VALUES (:id_serie, :id_saison, :id_episode, :titre_vo, :date_diff_original, :date_diff_fr,
+                 :titre_fr, :image_url_path, :duree, :description)'
+    );
+    $stmt->execute(adminEpisodeParams($data));
+}
+
+function adminUpdateEpisode(array $data): void
+{
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'UPDATE EPISODE
+         SET titre_vo = :titre_vo, date_diff_original = :date_diff_original, date_diff_fr = :date_diff_fr,
+             titre_fr = :titre_fr, image_url_path = :image_url_path, duree = :duree, description = :description
+         WHERE id_serie = :id_serie AND id_saison = :id_saison AND id_episode = :id_episode'
+    );
+    $stmt->execute(adminEpisodeParams($data));
+}
+
+function adminEpisodeParams(array $data): array
+{
+    return [
+        ':id_serie' => (int)($data['id_serie'] ?? 0),
+        ':id_saison' => (int)($data['id_saison'] ?? 1),
+        ':id_episode' => (int)($data['id_episode'] ?? 1),
+        ':titre_vo' => nullIfEmpty($data['titre_vo'] ?? null),
+        ':date_diff_original' => nullIfEmpty($data['date_diff_original'] ?? null),
+        ':date_diff_fr' => nullIfEmpty($data['date_diff_fr'] ?? null),
+        ':titre_fr' => trim($data['titre_fr'] ?? ''),
+        ':image_url_path' => nullIfEmpty($data['image_url_path'] ?? null),
+        ':duree' => nullIfEmpty($data['duree'] ?? null),
+        ':description' => nullIfEmpty($data['description'] ?? null),
+    ];
+}
+
+function adminDeleteEpisode(int $idSerie, int $idSaison, int $idEpisode): void
+{
+    $bdd = bddConexion();
+    $params = [':id_serie' => $idSerie, ':id_saison' => $idSaison, ':id_episode' => $idEpisode];
+    $bdd->beginTransaction();
+    try {
+        $bdd->prepare('DELETE FROM CASTING WHERE id_serie = :id_serie AND id_saison = :id_saison AND id_episode = :id_episode')->execute($params);
+        $bdd->prepare('DELETE FROM REALISER WHERE id_serie = :id_serie AND id_saison = :id_saison AND id_episode = :id_episode')->execute($params);
+        $bdd->prepare('DELETE FROM SCENARISER WHERE id_serie = :id_serie AND id_saison = :id_saison AND id_episode = :id_episode')->execute($params);
+        $bdd->prepare('DELETE FROM EPISODE WHERE id_serie = :id_serie AND id_saison = :id_saison AND id_episode = :id_episode')->execute($params);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminCreatePersonnage(array $data): void
+{
+    $bdd = bddConexion();
+    $idPersonnage = uniqid('perso_', true);
+    $bdd->beginTransaction();
+    try {
+        $bdd->prepare('INSERT INTO PERSONNE (id_personne, nom, prenom, image_url_path) VALUES (:id, :nom, :prenom, :image)')
+            ->execute([
+                ':id' => $idPersonnage,
+                ':nom' => trim($data['nom'] ?? ''),
+                ':prenom' => trim($data['prenom'] ?? ''),
+                ':image' => nullIfEmpty($data['image_url_path'] ?? null),
+            ]);
+        $bdd->prepare('INSERT INTO PERSONNAGE (id_personnage, desc_perso) VALUES (:id, :description)')
+            ->execute([':id' => $idPersonnage, ':description' => nullIfEmpty($data['desc_perso'] ?? null)]);
+
+        if (!empty($data['id_position'])) {
+            $bdd->prepare('INSERT INTO ATTACHER (id_personnage, id_position) VALUES (:id, :position)')
+                ->execute([':id' => $idPersonnage, ':position' => $data['id_position']]);
+        }
+
+        $idActor = adminFindOrCreateActor($bdd, $data);
+        adminAttachCastingIfRequested($bdd, $idPersonnage, $idActor, $data);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminUpdatePersonnage(array $data): void
+{
+    $bdd = bddConexion();
+    $bdd->beginTransaction();
+    try {
+        $bdd->prepare('UPDATE PERSONNE SET nom = :nom, prenom = :prenom, image_url_path = :image WHERE id_personne = :id')
+            ->execute([
+                ':id' => $data['id_personnage'],
+                ':nom' => trim($data['nom'] ?? ''),
+                ':prenom' => trim($data['prenom'] ?? ''),
+                ':image' => nullIfEmpty($data['image_url_path'] ?? null),
+            ]);
+        $bdd->prepare('UPDATE PERSONNAGE SET desc_perso = :description WHERE id_personnage = :id')
+            ->execute([':id' => $data['id_personnage'], ':description' => nullIfEmpty($data['desc_perso'] ?? null)]);
+        $bdd->prepare('DELETE FROM ATTACHER WHERE id_personnage = :id')->execute([':id' => $data['id_personnage']]);
+        if (!empty($data['id_position'])) {
+            $bdd->prepare('INSERT INTO ATTACHER (id_personnage, id_position) VALUES (:id, :position)')
+                ->execute([':id' => $data['id_personnage'], ':position' => $data['id_position']]);
+        }
+        $idActor = adminFindOrCreateActor($bdd, $data);
+        adminAttachCastingIfRequested($bdd, $data['id_personnage'], $idActor, $data);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminDeletePersonnage(string $idPersonnage): void
+{
+    $bdd = bddConexion();
+    $bdd->beginTransaction();
+    try {
+        $bdd->prepare('DELETE FROM CASTING WHERE id_personnage = :id')->execute([':id' => $idPersonnage]);
+        $bdd->prepare('DELETE FROM ATTACHER WHERE id_personnage = :id')->execute([':id' => $idPersonnage]);
+        $bdd->prepare('DELETE FROM PERSONNAGE WHERE id_personnage = :id')->execute([':id' => $idPersonnage]);
+        $bdd->prepare('DELETE FROM PERSONNE WHERE id_personne = :id')->execute([':id' => $idPersonnage]);
+        $bdd->commit();
+    } catch (Throwable $e) {
+        $bdd->rollBack();
+        throw $e;
+    }
+}
+
+function adminFindOrCreateActor(PDO $bdd, array $data): ?string
+{
+    $actorNom = trim($data['acteur_nom'] ?? '');
+    $actorPrenom = trim($data['acteur_prenom'] ?? '');
+
+    if ($actorNom === '' || $actorPrenom === '') {
+        return null;
+    }
+
+    $stmt = $bdd->prepare(
+        'SELECT act.id_acteur
+         FROM ACTEUR act
+         JOIN PERSONNE pe ON act.id_acteur = pe.id_personne
+         WHERE LOWER(pe.nom) = LOWER(:nom) AND LOWER(pe.prenom) = LOWER(:prenom)
+         LIMIT 1'
+    );
+    $stmt->execute([':nom' => $actorNom, ':prenom' => $actorPrenom]);
+    $existing = $stmt->fetchColumn();
+    if ($existing) {
+        return (string)$existing;
+    }
+
+    $idActor = uniqid('act_', true);
+    $bdd->prepare('INSERT INTO PERSONNE (id_personne, nom, prenom, image_url_path) VALUES (:id, :nom, :prenom, :image)')
+        ->execute([
+            ':id' => $idActor,
+            ':nom' => $actorNom,
+            ':prenom' => $actorPrenom,
+            ':image' => nullIfEmpty($data['acteur_image_url_path'] ?? null),
+        ]);
+    $bdd->prepare('INSERT INTO ACTEUR (id_acteur) VALUES (:id)')->execute([':id' => $idActor]);
+
+    return $idActor;
+}
+
+function adminAttachCastingIfRequested(PDO $bdd, string $idPersonnage, ?string $idActor, array $data): void
+{
+    $idSerie = (int)($data['casting_id_serie'] ?? 0);
+    $idSaison = (int)($data['casting_id_saison'] ?? 0);
+    $idEpisode = (int)($data['casting_id_episode'] ?? 0);
+    $idDoubleur = $data['id_doubleur'] ?? '';
+
+    if ($idSerie <= 0 || $idSaison <= 0 || $idEpisode <= 0 || $idActor === null || $idDoubleur === '') {
+        return;
+    }
+
+    $stmt = $bdd->prepare(
+        'INSERT INTO CASTING (id_serie, id_saison, id_episode, id_personnage, is_guest_star, id_doubleur, id_acteur)
+         VALUES (:id_serie, :id_saison, :id_episode, :id_personnage, :is_guest_star, :id_doubleur, :id_acteur)
+         ON CONFLICT (id_serie, id_saison, id_episode, id_personnage)
+         DO UPDATE SET is_guest_star = EXCLUDED.is_guest_star,
+                       id_doubleur = EXCLUDED.id_doubleur,
+                       id_acteur = EXCLUDED.id_acteur'
+    );
+    $stmt->execute([
+        ':id_serie' => $idSerie,
+        ':id_saison' => $idSaison,
+        ':id_episode' => $idEpisode,
+        ':id_personnage' => $idPersonnage,
+        ':is_guest_star' => isset($data['is_guest_star']) ? 'true' : 'false',
+        ':id_doubleur' => $idDoubleur,
+        ':id_acteur' => $idActor,
+    ]);
+}
+
+function nullIfEmpty(?string $value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+
+    $trimmed = trim($value);
+    return $trimmed === '' ? null : $trimmed;
 }

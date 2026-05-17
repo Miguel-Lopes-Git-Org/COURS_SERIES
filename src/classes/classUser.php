@@ -8,8 +8,6 @@ class User
     private ?string $streetAddress;
     private ?string $zipCode;
     private ?string $city;
-    private ?string $creditCardNumber;
-    private ?string $creditCardExpirationDate;
     private ?string $phoneNumber;
 
     public function __construct(
@@ -19,8 +17,6 @@ class User
         ?string $streetAddress,
         ?string $zipCode,
         ?string $city,
-        ?string $creditCardNumber,
-        ?string $creditCardExpirationDate,
         ?string $phoneNumber
     ) {
         try {
@@ -30,8 +26,6 @@ class User
             $this->streetAddress = $streetAddress;
             $this->zipCode = $zipCode;
             $this->city = $city;
-            $this->creditCardNumber = $creditCardNumber;
-            $this->creditCardExpirationDate = $creditCardExpirationDate;
             $this->phoneNumber = $phoneNumber;
         } catch (Exception $e) {
             die('Erreur : ' . $e->getMessage());
@@ -60,8 +54,4 @@ class User
         return ["streetAddress" => $this->streetAddress, "zipCode" => $this->zipCode, "city" => $this->city];
     }
 
-    public function getCreditCard(): array
-    {
-        return ["number" => $this->creditCardNumber, "expirationDate" => $this->creditCardExpirationDate];
-    }
 }

@@ -3,6 +3,7 @@
 -- ============================================================
 
 DROP TABLE IF EXISTS ATTACHER CASCADE;
+DROP TABLE IF EXISTS AUDIT_SAUVEGARDE CASCADE;
 DROP TABLE IF EXISTS DIFFUSER CASCADE;
 DROP TABLE IF EXISTS SCENARISER CASCADE;
 DROP TABLE IF EXISTS REALISER CASCADE;
@@ -89,10 +90,8 @@ CREATE TABLE USERS(
    streetAddress VARCHAR(100),
    zipCode VARCHAR(50),
    city VARCHAR(50),
-   creditCardNumber VARCHAR(16),
-   creditCardExpirationDate DATE,
-   creditCardCVV VARCHAR(4),
    phoneNumber VARCHAR(10),
+   role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
    PRIMARY KEY(id_user)
 );
 
@@ -234,6 +233,57 @@ CREATE TABLE ATTACHER(
    FOREIGN KEY(id_position) REFERENCES POSITION(id_position)
 );
 
+-- ============================================================
+-- JOURNALISATION DES SAUVEGARDES AVANT MODIFICATION/SUPPRESSION
+-- ============================================================
 
+CREATE TABLE AUDIT_SAUVEGARDE(
+   id_audit SERIAL PRIMARY KEY,
+   table_name VARCHAR(50) NOT NULL,
+   operation VARCHAR(10) NOT NULL,
+   saved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   saved_by TEXT DEFAULT CURRENT_USER,
+   old_data JSONB NOT NULL
+);
+
+CREATE OR REPLACE FUNCTION sauvegarder_ligne_avant_modification()
+RETURNS TRIGGER AS $$
+BEGIN
+   IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
+      INSERT INTO AUDIT_SAUVEGARDE(table_name, operation, old_data)
+      VALUES (TG_TABLE_NAME, TG_OP, TO_JSONB(OLD));
+   END IF;
+
+   IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+   END IF;
+
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_save_users
+BEFORE UPDATE OR DELETE ON USERS
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
+
+CREATE TRIGGER trg_save_serie
+BEFORE UPDATE OR DELETE ON SERIE
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
+
+CREATE TRIGGER trg_save_saison
+BEFORE UPDATE OR DELETE ON SAISON
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
+
+CREATE TRIGGER trg_save_episode
+BEFORE UPDATE OR DELETE ON EPISODE
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
+
+CREATE TRIGGER trg_save_personne
+BEFORE UPDATE OR DELETE ON PERSONNE
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
+
+CREATE TRIGGER trg_save_personnage
+BEFORE UPDATE OR DELETE ON PERSONNAGE
+FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
 
 

@@ -9,6 +9,8 @@ require_once("src/controllers/ControllerPageSerie.php");
 require_once("src/controllers/ControllerPageSerieDetail.php");
 require_once("src/controllers/ControllerPageSaisonDetail.php");
 require_once("src/controllers/ControllerPageEpisode.php");
+require_once("src/controllers/ControllerPageProfil.php");
+require_once("src/controllers/ControllerPageAdmin.php");
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
@@ -54,6 +56,24 @@ if ($action) {
             break;
         case 'episodeDetail':
             controllerPageEpisodeDetail();
+            break;
+        case 'profil':
+            controllerPageProfil();
+            break;
+        case 'admin':
+        case 'adminSerieCreate':
+        case 'adminSerieUpdate':
+        case 'adminSerieDelete':
+        case 'adminSaisonCreate':
+        case 'adminSaisonUpdate':
+        case 'adminSaisonDelete':
+        case 'adminEpisodeCreate':
+        case 'adminEpisodeUpdate':
+        case 'adminEpisodeDelete':
+        case 'adminPersonnageCreate':
+        case 'adminPersonnageUpdate':
+        case 'adminPersonnageDelete':
+            controllerPageAdmin();
             break;
         default:
             controllerPageLogin();

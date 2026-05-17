@@ -4,11 +4,11 @@
 
 CREATE VIEW createUser AS
 SELECT id_user, email, password, firstName, lastName,
-       streetAddress, zipCode, city, phoneNumber
+       streetAddress, zipCode, city, phoneNumber, role
 FROM USERS;
 
 CREATE VIEW getUserInformations AS
-SELECT firstName, lastName, email, password, streetAddress, zipCode, phoneNumber FROM USERS;
+SELECT firstName, lastName, email, password, streetAddress, zipCode, city, phoneNumber, role FROM USERS;
 
 -- ============================================================
 -- Vue Annexe 1 : Liste les détails d'une série
@@ -244,3 +244,43 @@ LEFT JOIN PERSONNE p_act ON act.id_acteur = p_act.id_personne
 LEFT JOIN DOUBLEUR dbl ON ca.id_doubleur = dbl.id_doubleur
 LEFT JOIN PERSONNE p_dbl ON dbl.id_doubleur = p_dbl.id_personne
 LEFT JOIN SERIE se ON ca.id_serie = se.id_serie;
+
+-- ============================================================
+-- DROITS SQL : UTILISATEUR ET ADMINISTRATEUR
+-- ============================================================
+
+DO $$
+BEGIN
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'serie_user') THEN
+      CREATE ROLE serie_user NOLOGIN;
+   END IF;
+
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'serie_admin') THEN
+      CREATE ROLE serie_admin NOLOGIN;
+   END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+   EXECUTE FORMAT('GRANT CONNECT ON DATABASE %I TO serie_user, serie_admin', CURRENT_DATABASE());
+END;
+$$;
+
+GRANT USAGE ON SCHEMA public TO serie_user, serie_admin;
+
+GRANT SELECT, INSERT ON createUser TO serie_user, serie_admin;
+GRANT SELECT ON getUserInformations TO serie_user, serie_admin;
+GRANT SELECT ON getAllSeries, getSerieDetails, getSerieCreateur, getSerieChaines, getChaines,
+                 getSaisonDetails, getSaisonProducteurs, getEpisodeDetails,
+                 getEpisodeScenaristes, getEpisodeRealisateurs, getEpisodeGuestStars,
+                 getPersonnageDetails
+TO serie_user, serie_admin;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON USERS, PERSONNE, PRODUCTEUR, CREATEUR, SCENARISTE,
+    REALISATEUR, ACTEUR, DOUBLEUR, PAYS, PERSONNAGE, GENRE, POSITION, SERIE, SAISON,
+    EPISODE, CHAINE, CASTING, PRODUIRE, REALISER, SCENARISER, DIFFUSER, ATTACHER
+TO serie_admin;
+
+GRANT SELECT ON AUDIT_SAUVEGARDE TO serie_admin;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO serie_admin;

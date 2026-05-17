@@ -64,17 +64,6 @@
                     <input class="form-control" type="text" name="city" placeholder="Ville">
                 </div>
 
-                <div class="pt-4 mt-4 border-t border-zinc-800">
-                    <h3 class="text-sm font-medium text-zinc-400 mb-4">Informations de paiement</h3>
-                    <div class="space-y-4">
-                        <input class="form-control" type="text" name="creditCardNumber" placeholder="Numéro de carte">
-                        <div class="grid grid-cols-2 gap-4">
-                            <input class="form-control" type="text" name="creditCardExpirationDate" placeholder="Expiration (MM/AA)">
-                            <input class="form-control" type="password" name="creditCardCVV" placeholder="CVV (ex: 123)" maxlength="4">
-                        </div>
-                    </div>
-                </div>
-
                 <button class="btn w-full mt-8 py-3.5 text-lg" type="submit">Créer le compte</button>
             </form>
 
