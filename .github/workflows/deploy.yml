@@ -25,5 +25,6 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          docker compose down
+          docker compose down --remove-orphans
+          docker ps --filter "publish=1000" -q | xargs -r docker rm -f
           docker compose up -d --build
