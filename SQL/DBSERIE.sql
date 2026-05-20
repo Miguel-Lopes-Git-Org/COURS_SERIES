@@ -90,7 +90,9 @@ CREATE TABLE USERS(
    streetAddress VARCHAR(100),
    zipCode VARCHAR(50),
    city VARCHAR(50),
-   phoneNumber VARCHAR(10),
+   phoneNumber VARCHAR(20),
+   cardNumberEncrypted TEXT,
+   cardExpirationEncrypted TEXT,
    role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
    PRIMARY KEY(id_user)
 );
@@ -285,5 +287,3 @@ FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
 CREATE TRIGGER trg_save_personnage
 BEFORE UPDATE OR DELETE ON PERSONNAGE
 FOR EACH ROW EXECUTE FUNCTION sauvegarder_ligne_avant_modification();
-
-

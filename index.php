@@ -45,6 +45,9 @@ if ($action) {
         case 'register':
             controllerPageLogin();
             break;
+        case 'registerDetails':
+            controllerPageRegisterDetails();
+            break;
         case 'serie':
             controllerPageSerie();
             break;

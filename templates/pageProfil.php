@@ -11,6 +11,7 @@ $fields = [
     'streetaddress' => 'Adresse',
     'zipcode' => 'Code postal',
     'city' => 'Ville',
+    'maskedcardnumber' => 'Carte bancaire',
     'role' => 'Role',
 ];
 ?>

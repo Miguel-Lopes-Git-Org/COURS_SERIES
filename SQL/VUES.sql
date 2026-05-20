@@ -4,11 +4,14 @@
 
 CREATE VIEW createUser AS
 SELECT id_user, email, password, firstName, lastName,
-       streetAddress, zipCode, city, phoneNumber, role
+       streetAddress, zipCode, city, phoneNumber,
+       cardNumberEncrypted, cardExpirationEncrypted, role
 FROM USERS;
 
 CREATE VIEW getUserInformations AS
-SELECT firstName, lastName, email, password, streetAddress, zipCode, city, phoneNumber, role FROM USERS;
+SELECT firstName, lastName, email, password, streetAddress, zipCode, city, phoneNumber,
+       cardNumberEncrypted, cardExpirationEncrypted, role
+FROM USERS;
 
 -- ============================================================
 -- Vue Annexe 1 : Liste les détails d'une série
@@ -270,6 +273,9 @@ $$;
 GRANT USAGE ON SCHEMA public TO serie_user, serie_admin;
 
 GRANT SELECT, INSERT ON createUser TO serie_user, serie_admin;
+GRANT UPDATE (firstName, lastName, streetAddress, zipCode, city, phoneNumber,
+              cardNumberEncrypted, cardExpirationEncrypted)
+ON createUser TO serie_user, serie_admin;
 GRANT SELECT ON getUserInformations TO serie_user, serie_admin;
 GRANT SELECT ON getAllSeries, getSerieDetails, getSerieCreateur, getSerieChaines, getChaines,
                  getSaisonDetails, getSaisonProducteurs, getEpisodeDetails,

@@ -31,11 +31,41 @@ function controllerPageLogin(): void
 
             if (empty($registerErrors)) {
                 // Redirection après inscription
-                header('Location: index.php?action=login&registered=1');
+                $user = getCurrentUserInformations(trim($_POST['email'] ?? ''));
+                if ($user !== null) {
+                    startUserSession($user);
+                }
+
+                header('Location: index.php?action=registerDetails');
                 exit;
             }
         }
     }
 
     require_once __DIR__ . '/../../templates/pageLogin.php';
+}
+
+function controllerPageRegisterDetails(): void
+{
+    if (!isset($_SESSION['email'])) {
+        header('Location: ?action=login');
+        exit;
+    }
+
+    $registerDetailsErrors = [];
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $action = $_POST['action'] ?? '';
+
+        if ($action === 'registerDetails') {
+            $registerDetailsErrors = completeUserRegistration($_SESSION['email'], $_POST);
+
+            if (empty($registerDetailsErrors)) {
+                header('Location: index.php?action=serie');
+                exit;
+            }
+        }
+    }
+
+    require_once __DIR__ . '/../../templates/pageRegisterDetails.php';
 }

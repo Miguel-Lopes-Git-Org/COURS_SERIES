@@ -14,7 +14,7 @@ Versions minimales recommandees :
 - Navigateur recent compatible HTML5/CSS3
 - Docker et Docker Compose pour l'execution locale
 
-Le fichier `Dockerfile` construit le serveur PHP/Apache et installe les extensions PostgreSQL. Le fichier `docker-compose.yml` expose l'application sur le port `1000`.
+Le fichier `Dockerfile` construit le serveur PHP/Apache et installe les extensions PostgreSQL. Le fichier `docker-compose.yml` expose l'application sur le port `1000`. En production, le workflow `.github/workflows/deploy.yml` genere `src/myParam.inc.php` depuis les secrets GitHub Actions avant le build Docker.
 
 ## 3. Organisation MVC
 
@@ -57,7 +57,7 @@ Les scripts SQL sont organises comme suit :
 
 Les donnees utilisateur sont stockees dans `USERS`. Le mot de passe est hache par PHP avec `password_hash`. Le role est stocke dans la colonne `role` avec les valeurs autorisees `user` et `admin`.
 
-Les informations de carte bancaire et le CVV ne sont pas collectes par le formulaire d'inscription et ne sont pas stockes par l'application.
+Le numero de carte et la date d'expiration sont stockes chiffres avec OpenSSL (`AES-256-CBC`) et une cle applicative `ENCRYPTION_KEY`. Le CCV est demande pendant la completion de l'inscription mais n'est jamais stocke.
 
 ## 7. Securite
 
@@ -66,6 +66,9 @@ Mesures presentes :
 - Authentification obligatoire pour les pages applicatives.
 - Regeneration de l'identifiant de session apres connexion.
 - Mot de passe hache avec empreinte unique.
+- Donnees bancaires sensibles chiffrees de facon reversible avec une cle applicative.
+- Numero de carte masque dans le profil : seuls les 4 derniers chiffres sont affiches.
+- CCV non conserve en base de donnees.
 - Verification de complexite du mot de passe : 12 caracteres minimum, majuscule, minuscule, chiffre et caractere special.
 - Requetes SQL preparees pour les parametres utilisateur.
 - Echappement HTML avec `htmlspecialchars` dans les templates.
@@ -91,7 +94,7 @@ Les actions admin sont accessibles via `index.php?action=admin`.
 
 ## 9. Installation locale
 
-1. Creer le fichier `src/myParam.inc.php` avec les constantes suivantes :
+1. Creer le fichier `src/myParam.inc.php` a partir de `src/myParam.inc.php.example` avec les constantes suivantes :
 
 ```php
 <?php
@@ -99,6 +102,17 @@ define('DB_HOST', 'nom_hote_postgresql');
 define('DB_NAME', 'nom_base');
 define('DB_USER', 'utilisateur');
 define('DB_PASS', 'mot_de_passe');
+define('ENCRYPTION_KEY', 'cle_longue_aleatoire_a_changer');
+```
+
+Pour le deploiement GitHub Actions, renseigner les secrets suivants afin que `.github/workflows/deploy.yml` genere `src/myParam.inc.php` :
+
+```text
+HOST
+USER
+PASS
+DBNAME
+ENCRYPTION_KEY
 ```
 
 2. Executer les scripts SQL dans cet ordre :
@@ -107,6 +121,12 @@ define('DB_PASS', 'mot_de_passe');
 SQL/DBSERIE.sql
 SQL/INSERT.sql
 SQL/VUES.sql
+```
+
+Pour mettre a jour une base deja existante sans la recreer, executer aussi :
+
+```text
+SQL/ALTER_USERS_PAYMENT.sql
 ```
 
 3. Lancer l'application :

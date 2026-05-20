@@ -314,24 +314,106 @@ function registerUser(array $data): array
     $role = $userCount === 0 ? 'admin' : 'user';
 
     $stmt = $bdd->prepare(
-        'INSERT INTO createUser (id_user, email, password, firstName, lastName, streetAddress, zipCode, city, phoneNumber, role)
-         VALUES
-            (:id_user, :email, :password, :firstName, :lastName,
-             :streetAddress, :zipCode, :city, :phoneNumber, :role)'
+        'INSERT INTO createUser (id_user, email, password, role)
+         VALUES (:id_user, :email, :password, :role)'
     );
 
     $stmt->execute([
         ':id_user'       => $id_user,
         ':email'         => $data['email'],
         ':password'      => $hashed,
-        ':firstName'     => $data['firstName']     ?? null,
-        ':lastName'      => $data['lastName']      ?? null,
-        ':streetAddress' => $data['streetAddress'] ?? null,
-        ':zipCode'       => $data['zipCode']       ?? null,
-        ':city'          => $data['city']          ?? null,
-        ':phoneNumber'   => $data['phoneNumber']   ?? null,
         ':role'          => $role,
     ]);
+
+    return [];
+}
+
+function completeUserRegistration(string $email, array $data): array
+{
+    $errors = [];
+
+    $requiredFields = [
+        'firstName' => 'Le prenom est obligatoire.',
+        'lastName' => 'Le nom est obligatoire.',
+        'phoneNumber' => 'Le telephone est obligatoire.',
+        'streetAddress' => 'L adresse complete est obligatoire.',
+        'zipCode' => 'Le code postal est obligatoire.',
+        'city' => 'La ville est obligatoire.',
+        'cardNumber' => 'Le numero de carte est obligatoire.',
+        'cardCvv' => 'Le CCV est obligatoire.',
+        'cardExpiration' => 'La date d expiration est obligatoire.',
+    ];
+
+    foreach ($requiredFields as $field => $message) {
+        if (trim((string)($data[$field] ?? '')) === '') {
+            $errors[] = $message;
+        }
+    }
+
+    $phoneNumber = preg_replace('/\s+/', '', (string)($data['phoneNumber'] ?? ''));
+    if ($phoneNumber !== '' && !preg_match('/^[0-9+.-]{6,20}$/', $phoneNumber)) {
+        $errors[] = 'Le telephone est invalide.';
+    }
+
+    $zipCode = trim((string)($data['zipCode'] ?? ''));
+    if ($zipCode !== '' && !preg_match('/^[0-9A-Za-z -]{3,12}$/', $zipCode)) {
+        $errors[] = 'Le code postal est invalide.';
+    }
+
+    $cardNumber = preg_replace('/\D+/', '', (string)($data['cardNumber'] ?? ''));
+    if ($cardNumber !== '' && !preg_match('/^\d{13,19}$/', $cardNumber)) {
+        $errors[] = 'Le numero de carte est invalide.';
+    }
+
+    $cardCvv = preg_replace('/\D+/', '', (string)($data['cardCvv'] ?? ''));
+    if ($cardCvv !== '' && !preg_match('/^\d{3,4}$/', $cardCvv)) {
+        $errors[] = 'Le CCV est invalide.';
+    }
+
+    $cardExpiration = trim((string)($data['cardExpiration'] ?? ''));
+    if ($cardExpiration !== '' && !preg_match('/^(0[1-9]|1[0-2])\/([0-9]{2}|[0-9]{4})$/', $cardExpiration)) {
+        $errors[] = 'La date d expiration doit etre au format MM/AA ou MM/AAAA.';
+    }
+
+    if (!empty($errors)) {
+        return $errors;
+    }
+
+    $encryptedCardNumber = encryptSensitiveData($cardNumber);
+    $encryptedExpiration = encryptSensitiveData($cardExpiration);
+
+    if ($encryptedCardNumber === null || $encryptedExpiration === null) {
+        return ['Impossible de chiffrer les donnees bancaires. Verifiez la configuration ENCRYPTION_KEY.'];
+    }
+
+    $bdd = bddConexion();
+    $stmt = $bdd->prepare(
+        'UPDATE createUser
+         SET firstName = :firstName,
+             lastName = :lastName,
+             streetAddress = :streetAddress,
+             zipCode = :zipCode,
+             city = :city,
+             phoneNumber = :phoneNumber,
+             cardNumberEncrypted = :cardNumberEncrypted,
+             cardExpirationEncrypted = :cardExpirationEncrypted
+         WHERE email = :email'
+    );
+
+    $stmt->execute([
+        ':firstName' => trim((string)$data['firstName']),
+        ':lastName' => trim((string)$data['lastName']),
+        ':streetAddress' => trim((string)$data['streetAddress']),
+        ':zipCode' => $zipCode,
+        ':city' => trim((string)$data['city']),
+        ':phoneNumber' => $phoneNumber,
+        ':cardNumberEncrypted' => $encryptedCardNumber,
+        ':cardExpirationEncrypted' => $encryptedExpiration,
+        ':email' => $email,
+    ]);
+
+    $_SESSION['firstName'] = trim((string)$data['firstName']);
+    $_SESSION['lastName'] = trim((string)$data['lastName']);
 
     return [];
 }
@@ -380,7 +462,108 @@ function getCurrentUserInformations(string $email): ?array
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    return $user ?: null;
+    if (!$user) {
+        return null;
+    }
+
+    $cardNumber = decryptSensitiveData($user['cardnumberencrypted'] ?? null);
+    $user['maskedcardnumber'] = maskCardNumber($cardNumber);
+
+    return $user;
+}
+
+function startUserSession(array $user): void
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    session_regenerate_id(true);
+
+    $_SESSION['email']     = $user['email'];
+    $_SESSION['firstName'] = $user['firstname'] ?? null;
+    $_SESSION['lastName']  = $user['lastname']  ?? null;
+    $_SESSION['role']      = $user['role'] ?? 'user';
+}
+
+function encryptSensitiveData(?string $plainText): ?string
+{
+    if ($plainText === null || $plainText === '') {
+        return null;
+    }
+
+    $key = getEncryptionKey();
+    if ($key === null || !function_exists('openssl_encrypt')) {
+        return null;
+    }
+
+    $cipher = 'AES-256-CBC';
+    $ivLength = openssl_cipher_iv_length($cipher);
+    if ($ivLength === false) {
+        return null;
+    }
+
+    $iv = random_bytes($ivLength);
+    $encrypted = openssl_encrypt($plainText, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+    if ($encrypted === false) {
+        return null;
+    }
+
+    return base64_encode($iv . $encrypted);
+}
+
+function decryptSensitiveData(?string $encryptedText): ?string
+{
+    if ($encryptedText === null || $encryptedText === '') {
+        return null;
+    }
+
+    $key = getEncryptionKey();
+    if ($key === null || !function_exists('openssl_decrypt')) {
+        return null;
+    }
+
+    $cipher = 'AES-256-CBC';
+    $ivLength = openssl_cipher_iv_length($cipher);
+    if ($ivLength === false) {
+        return null;
+    }
+
+    $raw = base64_decode($encryptedText, true);
+    if ($raw === false || strlen($raw) <= $ivLength) {
+        return null;
+    }
+
+    $iv = substr($raw, 0, $ivLength);
+    $cipherText = substr($raw, $ivLength);
+    $plainText = openssl_decrypt($cipherText, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+
+    return $plainText === false ? null : $plainText;
+}
+
+function maskCardNumber(?string $cardNumber): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$cardNumber);
+    if ($digits === '') {
+        return 'Non renseigne';
+    }
+
+    $lastDigits = substr($digits, -4);
+    return str_repeat('*', max(strlen($digits) - 4, 0)) . $lastDigits;
+}
+
+function getEncryptionKey(): ?string
+{
+    $paramFile = __DIR__ . '/myParam.inc.php';
+    if (!defined('ENCRYPTION_KEY') && file_exists($paramFile)) {
+        require_once $paramFile;
+    }
+
+    if (defined('ENCRYPTION_KEY') && ENCRYPTION_KEY !== '') {
+        return hash('sha256', ENCRYPTION_KEY, true);
+    }
+
+    return null;
 }
 
 function getAdminDashboardData(): array

@@ -1,30 +1,31 @@
 name: Deploy Application
 
 on:
-  push:
-    branches:
-      - prod
+    push:
+        branches:
+            - prod
 
 jobs:
-  deploy:
-    runs-on: self-hosted
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    deploy:
+        runs-on: self-hosted
+        environment: production
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Create myParam.inc.php
-        run: |
-          cat > src/myParam.inc.php << PHPEOF
-          <?php
-          define('DB_HOST', '${{ secrets.HOST }}');
-          define('DB_USER', '${{ secrets.USER }}');
-          define('DB_PASS', '${{ secrets.PASS }}');
-          define('DB_NAME', '${{ secrets.DBNAME }}');
-          PHPEOF
+            - name: Create myParam.inc.php
+              run: |
+                  cat > src/myParam.inc.php << PHPEOF
+                  <?php
+                  define('DB_HOST', '${{ secrets.HOST }}');
+                  define('DB_USER', '${{ secrets.USER }}');
+                  define('DB_PASS', '${{ secrets.PASS }}');
+                  define('DB_NAME', '${{ secrets.DBNAME }}');
+                  define('ENCRYPTION_KEY', '${{ secrets.ENCRYPTION_KEY }}');
+                  PHPEOF
 
-      - name: Deploy with Docker Compose
-        run: |
-          docker compose down --remove-orphans
-          docker ps --filter "publish=1000" -q | xargs -r docker rm -f
-          docker compose up -d --build
+            - name: Deploy with Docker Compose
+              run: |
+                  docker compose down --remove-orphans
+                  docker ps --filter "publish=1000" -q | xargs -r docker rm -f
+                  docker compose up -d --build
