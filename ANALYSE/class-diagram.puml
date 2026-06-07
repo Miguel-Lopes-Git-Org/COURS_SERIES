@@ -1,0 +1,178 @@
+@startuml class-diagram
+  package classes as classes {
+    class "CHAINE" as classes_CHAINE {
+      -nomChaine : string
+      -numeroChaine : int
+      -pays : string
+      -codeIso : string
+      +__construct(nomChaine, numeroChaine, pays, codeIso)
+      +__destruct()
+      +getNomChaine()
+      +getNumeroChaine()
+      +getPays()
+      +getCodeIso()
+    }
+    class "EPISODE" as classes_EPISODE {
+      -titreSerie : string
+      -slug : string
+      -nbSaisons : int
+      -idSaison : int
+      -numEpisode : int
+      -titreVo : string
+      -titreFr : string
+      -dateDiffusionUsa : ?string
+      -dateDiffusionFr : ?string
+      -resume : ?string
+      -imageUrlPath : ?string
+      -bannerPathUrl : ?string
+      -description : ?string
+      +__construct(titreSerie, slug, nbSaisons, idSaison, numEpisode, titreVo, titreFr, dateDiffusionUsa, dateDiffusionFr, resume, imageUrlPath, bannerPathUrl, description)
+      +getTitreSerie()
+      +getSlug()
+      +getNbSaisons()
+      +getIdSaison()
+      +getNumEpisode()
+      +getTitreVo()
+      +getTitreFr()
+      +getDateDiffusionUsa()
+      +getDateDiffusionFr()
+      +getResume()
+      +getImageUrlPath()
+      +getBannerPathUrl()
+      +getDescription()
+    }
+    class "Personne" as classes_Personne {
+      #nom : string
+      #prenom : string
+      #image_url_path : string
+      +__construct(nom, prenom, image_url_path)
+      +getNom()
+      +setNom(nom)
+      +getPrenom()
+      +setPrenom(prenom)
+      +getImageUrlPath()
+      +setImageUrlPath(image_url_path)
+      +getNomComplet()
+    }
+    class "Producteur" as classes_Producteur {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Createur" as classes_Createur {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Scenariste" as classes_Scenariste {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Realisateur" as classes_Realisateur {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Acteur" as classes_Acteur {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Doubleur" as classes_Doubleur {
+      +__construct(nom, prenom, image_url_path)
+    }
+    class "Personnage" as classes_Personnage {
+      -desc_perso : string
+      +__construct(nom, prenom, image_url_path, desc_perso)
+      +getDescPerso()
+      +setDescPerso(desc_perso)
+    }
+    class "GuestStar" as classes_GuestStar {
+      -position : Position
+      +__construct(nom, prenom, position, image_url_path)
+      +getPosition()
+    }
+    class "Position" as classes_Position {
+      -libelle : string
+      +__construct(libelle)
+      +getLibelle()
+    }
+    class "SAISON" as classes_SAISON {
+      -idSaison : int
+      -numSaison : int
+      -nbEpisode : int
+      +__construct(idSaison, numSaison, nbEpisode)
+      +__destruct()
+      +getIdSaison()
+      +getNumSaison()
+      +getNbEpisode()
+    }
+    class "SERIES" as classes_SERIES {
+      -titreVF : string
+      -imageUrlPath : ?string
+      -videoPathUrl : ?string
+      -bannerPathUrl : ?string
+      -slug : ?string
+      -genre : ?string
+      -pays : ?string
+      +__construct(titreVF, imageUrlPath, videoPathUrl, bannerPathUrl, slug, genre, pays)
+      +__destruct()
+      +getTitreVF()
+      +getImageUrlPath()
+      +getVideoPathUrl()
+      +getBannerPathUrl()
+      +getSlug()
+      +getGenre()
+      +getPays()
+    }
+    class "SERIESDETAIL" as classes_SERIESDETAIL {
+      -titreVF : string
+      -titreVO : ?string
+      -description : ?string
+      -dateCreation : ?string
+      -imageUrlPath : ?string
+      -videoPathUrl : ?string
+      -bannerPathUrl : ?string
+      -musiqueGenerique : ?string
+      -slug : ?string
+      -genre : ?string
+      -pays : ?string
+      -nombreSaisons : ?string
+      -dureeMoyenneEpisodes : ?string
+      -chaineDiffusion : CHAINE[]
+      +__construct(titreVF, titreVO, description, dateCreation, imageUrlPath, videoPathUrl, bannerPathUrl, musiqueGenerique, slug, genre, pays, nombreSaisons, dureeMoyenneEpisodes)
+      +__destruct()
+      +getTitreVF()
+      +getTitreVO()
+      +getDescription()
+      +getDateCreation()
+      +getImageUrlPath()
+      +getVideoPathUrl()
+      +getBannerPathUrl()
+      +getMusiqueGenerique()
+      +getSlug()
+      +getGenre()
+      +getPays()
+      +getNbSaisons()
+      +getDureeMoyenneEpisodes()
+      +setChaineDiffusion(chaines)
+      +getChaineDiffusion()
+    }
+    class "User" as classes_User {
+      -email : string
+      -firstName : ?string
+      -lastName : ?string
+      -streetAddress : ?string
+      -zipCode : ?string
+      -city : ?string
+      -phoneNumber : ?string
+      +__construct(email, firstName, lastName, streetAddress, zipCode, city, phoneNumber)
+      +__destruct()
+      +getEmail()
+      +getPhoneNumber()
+      +getName()
+      +getLocalisation()
+    }
+  }
+  classes_GuestStar ..> classes_Position
+  classes_Personne <|-- classes_Acteur
+  classes_Personne <|-- classes_Createur
+  classes_Personne <|-- classes_Doubleur
+  classes_Personne <|-- classes_GuestStar
+  classes_Personne <|-- classes_Personnage
+  classes_Personne <|-- classes_Producteur
+  classes_Personne <|-- classes_Realisateur
+  classes_Personne <|-- classes_Scenariste
+  classes_SERIESDETAIL "1" ..> "*" classes_CHAINE
+@enduml
